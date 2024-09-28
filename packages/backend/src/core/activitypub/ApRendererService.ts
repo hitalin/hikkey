@@ -30,7 +30,7 @@ import { IdService } from '@/core/IdService.js';
 import { JsonLdService } from './JsonLdService.js';
 import { ApMfmService } from './ApMfmService.js';
 import { CONTEXT } from './misc/contexts.js';
-import type { IAccept, IActivity, IAdd, IAnnounce, IApDocument, IApEmoji, IApHashtag, IApImage, IApMention, IBlock, ICreate, IDelete, IFlag, IFollow, IKey, ILike, IMove, IObject, IPost, IQuestion, IReject, IRemove, ITombstone, IUndo, IUpdate } from './type.js';
+import type { IAccept, IActivity, IAdd, IAnnounce, IApDocument, IApEmoji, IApHashtag, IApImage, IApMention, IApReversi, IBlock, ICreate, IDelete, IFlag, IFollow, IInvite, IJoin, IKey, ILeave, ILike, IMove, IObject, IPost, IQuestion, IReject, IRemove, ITombstone, IUndo, IUpdate } from './type.js';
 
 @Injectable()
 export class ApRendererService {
@@ -459,13 +459,23 @@ export class ApRendererService {
 			this.userProfilesRepository.findOneByOrFail({ userId: user.id }),
 		]);
 
-		const attachment = profile.fields.map(field => ({
+		const profileFields = profile.fields.map(field => ({
 			type: 'PropertyValue',
 			name: field.name,
 			value: (field.value.startsWith('http://') || field.value.startsWith('https://'))
 				? `<a href="${new URL(field.value).href}" rel="me nofollow noopener" target="_blank">${new URL(field.value).href}</a>`
 				: field.value,
 		}));
+
+		const mutualLinks = profile.mutualLinkSections.flatMap(section =>
+			section.mutualLinks.map(link => ({
+				type: 'PropertyValue',
+				name: section.name ?? link.description ?? 'Link',
+				value: `<a href="${link.url}" target="_blank">${link.description ?? link.url}</a>`,
+			})),
+		);
+
+		const attachment = mutualLinks.concat(profileFields);
 
 		const emojis = await this.getEmojis(user.emojis);
 		const apemojis = emojis.filter(emoji => !emoji.localOnly).map(emoji => this.renderEmoji(emoji));
@@ -518,6 +528,25 @@ export class ApRendererService {
 
 		if (profile.location) {
 			person['vcard:Address'] = profile.location;
+		}
+
+		if (profile.mutualLinkSections.length > 0) {
+			const ApMutualLinkSections = await Promise.all(profile.mutualLinkSections.map(async section => {
+				return {
+					sectionName: section.name ? this.mfmService.toHtml(mfm.parse(section.name)) : null,
+					_misskey_sectionName: section.name,
+					entrys: await Promise.all(section.mutualLinks.map(async entry => {
+						const img = await this.driveFilesRepository.findOneBy({ id: entry.fileId });
+						return {
+							description: entry.description ? this.mfmService.toHtml(mfm.parse(entry.description)) : null,
+							_misskey_description: entry.description,
+							image: img ? this.renderImage(img) : null,
+							url: entry.url,
+						};
+					})),
+				};
+			}));
+			person.banner = ApMutualLinkSections;
 		}
 
 		return person;
@@ -688,5 +717,98 @@ export class ApRendererService {
 		const emojis = names.map(name => allEmojis.get(name)).filter(x => x != null);
 
 		return emojis;
+	}
+
+	@bindThis
+	public async renderReversiInvite(game_session_id:string, invite_from:MiUser, invite_to:MiRemoteUser, invite_date:Date): Promise<IInvite> {
+		const game:IApReversi = {
+			type: 'Game',
+			game_type_uuid: '1c086295-25e3-4b82-b31e-3e3959906312',
+			extent_flags: [],
+			game_state: {
+				game_session_id,
+			},
+		};
+		const activity: IInvite = {
+			id: `${this.config.url}/games/${game.game_type_uuid}/${game_session_id}/activity`,
+			actor: this.userEntityService.genLocalUserUri(invite_from.id),
+			type: 'Invite',
+			published: invite_date.toISOString(),
+			object: game,
+		};
+		activity.to = invite_to.uri;
+		activity.cc = [];
+
+		return activity;
+	}
+
+	@bindThis
+	public async renderReversiJoin(game_session_id:string, join_user:MiUser, invite_from:MiRemoteUser, join_date:Date): Promise<IJoin> {
+		const game:IApReversi = {
+			type: 'Game',
+			game_type_uuid: '1c086295-25e3-4b82-b31e-3e3959906312',
+			extent_flags: [],
+			game_state: {
+				game_session_id,
+			},
+		};
+		const activity: IJoin = {
+			id: `${this.config.url}/games/${game.game_type_uuid}/${game_session_id}/activity`,
+			actor: this.userEntityService.genLocalUserUri(join_user.id),
+			type: 'Join',
+			published: join_date.toISOString(),
+			object: game,
+		};
+		activity.to = invite_from.uri;
+		activity.cc = [];
+
+		return activity;
+	}
+
+	@bindThis
+	public async renderReversiUpdate(local_user:MiUser, remote_user:MiRemoteUser,
+		game_state: {
+			game_session_id: string;
+			type:string;
+			pos?:number;//石配置
+			key?:string;//設定変更
+			value?:any;//設定変更
+			ready?:boolean;//ゲーム開始
+		},
+	) {
+		const game:IApReversi = {
+			type: 'Game',
+			game_type_uuid: '1c086295-25e3-4b82-b31e-3e3959906312',
+			extent_flags: [],
+			game_state,
+		};
+		const activity: IUpdate = {
+			type: 'Update',
+			actor: this.userEntityService.genLocalUserUri(local_user.id),
+			object: game,
+		};
+		activity.to = remote_user.uri;
+		activity.cc = [];
+
+		return activity;
+	}
+
+	@bindThis
+	public async renderReversiLeave(local_user: MiUser, remote_user: MiRemoteUser, game_state: { game_session_id: string; }) {
+		const game:IApReversi = {
+			type: 'Game',
+			game_type_uuid: '1c086295-25e3-4b82-b31e-3e3959906312',
+			extent_flags: [],
+			game_state,
+		};
+		const activity: ILeave = {
+			type: 'Leave',
+			actor: this.userEntityService.genLocalUserUri(local_user.id),
+			object: game,
+		};
+		activity.to = remote_user.uri;
+		activity.cc = [];
+
+		return activity;
 	}
 }

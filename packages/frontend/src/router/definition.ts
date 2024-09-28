@@ -113,6 +113,10 @@ const routes: RouteDef[] = [{
 		name: 'navbar',
 		component: page(() => import('@/pages/settings/navbar.vue')),
 	}, {
+		path: '/post-form',
+		name: 'post-form',
+		component: page(() => import('@/pages/settings/post-form.vue')),
+	}, {
 		path: '/statusbar',
 		name: 'statusbar',
 		component: page(() => import('@/pages/settings/statusbar.vue')),
@@ -204,9 +208,6 @@ const routes: RouteDef[] = [{
 	path: '/contact',
 	component: page(() => import('@/pages/contact.vue')),
 }, {
-	path: '/about-misskey',
-	component: page(() => import('@/pages/about-misskey.vue')),
-}, {
 	path: '/invite',
 	name: 'invite',
 	component: page(() => import('@/pages/invite.vue')),
@@ -240,7 +241,7 @@ const routes: RouteDef[] = [{
 		origin: 'origin',
 	},
 }, {
-	// Legacy Compatibility	
+	// Legacy Compatibility
 	path: '/authorize-follow',
 	redirect: '/lookup',
 	loginRequired: true,

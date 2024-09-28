@@ -94,6 +94,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 							</MkSwitch>
 						</MkFolder>
 
+						<MkFolder v-if="matchQuery([i18n.ts._role._options.canEmojiDeletion, 'canEmojiDeletion'])">
+							<template #label>{{ i18n.ts._role._options.canEmojiDeletion }}</template>
+							<template #suffix>{{ policies.canEmojiDeletion ? i18n.ts.yes : i18n.ts.no }}</template>
+							<MkSwitch v-model="policies.canEmojiDeletion">
+								<template #label>{{ i18n.ts.enable }}</template>
+							</MkSwitch>
+						</MkFolder>
+
 						<MkFolder v-if="matchQuery([i18n.ts._role._options.canManageCustomEmojis, 'canManageCustomEmojis'])">
 							<template #label>{{ i18n.ts._role._options.canManageCustomEmojis }}</template>
 							<template #suffix>{{ policies.canManageCustomEmojis ? i18n.ts.yes : i18n.ts.no }}</template>
@@ -196,6 +204,20 @@ SPDX-License-Identifier: AGPL-3.0-only
 							<template #label>{{ i18n.ts._role._options.userEachUserListsMax }}</template>
 							<template #suffix>{{ policies.userEachUserListsLimit }}</template>
 							<MkInput v-model="policies.userEachUserListsLimit" type="number">
+							</MkInput>
+						</MkFolder>
+
+						<MkFolder v-if="matchQuery([i18n.ts._role._options.mutualLinkSectionLimit, 'mutualLinkSectionLimit'])">
+							<template #label>{{ i18n.ts._role._options.mutualLinkSectionLimit }}</template>
+							<template #suffix>{{ policies.mutualLinkSectionLimit }}</template>
+							<MkInput v-model="policies.mutualLinkSectionLimit" type="number">
+							</MkInput>
+						</MkFolder>
+
+						<MkFolder v-if="matchQuery([i18n.ts._role._options.mutualLinkLimit, 'mutualLinkLimit'])">
+							<template #label>{{ i18n.ts._role._options.mutualLinkLimit }}</template>
+							<template #suffix>{{ policies.mutualLinkLimit }}</template>
+							<MkInput v-model="policies.mutualLinkLimit" type="number">
 							</MkInput>
 						</MkFolder>
 

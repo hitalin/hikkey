@@ -208,6 +208,10 @@ export const packedRolePoliciesSchema = {
 			type: 'boolean',
 			optional: false, nullable: false,
 		},
+		canEmojiDeletion: {
+			type: 'boolean',
+			optional: false, nullable: false,
+		},
 		canSearchNotes: {
 			type: 'boolean',
 			optional: false, nullable: false,
@@ -269,6 +273,14 @@ export const packedRolePoliciesSchema = {
 			optional: false, nullable: false,
 		},
 		avatarDecorationLimit: {
+			type: 'integer',
+			optional: false, nullable: false,
+		},
+		mutualLinkSectionLimit: {
+			type: 'integer',
+			optional: false, nullable: false,
+		},
+		mutualLinkLimit: {
 			type: 'integer',
 			optional: false, nullable: false,
 		},

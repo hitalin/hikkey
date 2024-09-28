@@ -82,6 +82,7 @@ export const ROLE_POLICIES = [
 	'inviteExpirationTime',
 	'canManageCustomEmojis',
 	'canManageAvatarDecorations',
+	'canEmojiDeletion',
 	'canSearchNotes',
 	'canUseTranslator',
 	'canHideAds',
@@ -98,6 +99,8 @@ export const ROLE_POLICIES = [
 	'userEachUserListsLimit',
 	'rateLimitFactor',
 	'avatarDecorationLimit',
+	'mutualLinkSectionLimit',
+	'mutualLinkLimit',
 ] as const;
 
 // なんか動かない

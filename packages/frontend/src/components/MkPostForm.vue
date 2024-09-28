@@ -32,6 +32,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<span :class="$style.headerRightButtonText">{{ channel.name }}</span>
 				</button>
 			</template>
+			<button v-click-anime v-tooltip="i18n.ts.drafts" class="_button" :class="$style.headerRightItem" @click="chooseDraft"><i class="ti ti-note"></i></button>
 			<button v-click-anime v-tooltip="i18n.ts._visibility.disableFederation" class="_button" :class="[$style.headerRightItem, { [$style.danger]: localOnly }]" :disabled="channel != null || visibility === 'specified'" @click="toggleLocalOnly">
 				<span v-if="!localOnly"><i class="ti ti-rocket"></i></span>
 				<span v-else><i class="ti ti-rocket-off"></i></span>
@@ -74,19 +75,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<input v-show="withHashtags" ref="hashtagsInputEl" v-model="hashtags" :class="$style.hashtags" :placeholder="i18n.ts.hashtags" list="hashtags">
 	<XPostFormAttaches v-model="files" @detach="detachFile" @changeSensitive="updateFileSensitive" @changeName="updateFileName" @replaceFile="replaceFile"/>
 	<MkPollEditor v-if="poll" v-model="poll" @destroyed="poll = null"/>
+	<MkDeleteScheduleEditor v-if="scheduledNoteDelete" v-model="scheduledNoteDelete" @destroyed="scheduledNoteDelete = null"/>
 	<MkNotePreview v-if="showPreview" :class="$style.preview" :text="text" :files="files" :poll="poll ?? undefined" :useCw="useCw" :cw="cw" :user="postAccount ?? $i"/>
 	<div v-if="showingOptions" style="padding: 8px 16px;">
 	</div>
 	<footer :class="$style.footer">
 		<div :class="$style.footerLeft">
-			<button v-tooltip="i18n.ts.attachFile" class="_button" :class="$style.footerButton" @click="chooseFileFrom"><i class="ti ti-photo-plus"></i></button>
-			<button v-tooltip="i18n.ts.poll" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: poll }]" @click="togglePoll"><i class="ti ti-chart-arrows"></i></button>
-			<button v-tooltip="i18n.ts.useCw" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: useCw }]" @click="useCw = !useCw"><i class="ti ti-eye-off"></i></button>
-			<button v-tooltip="i18n.ts.mention" class="_button" :class="$style.footerButton" @click="insertMention"><i class="ti ti-at"></i></button>
-			<button v-tooltip="i18n.ts.hashtags" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: withHashtags }]" @click="withHashtags = !withHashtags"><i class="ti ti-hash"></i></button>
-			<button v-if="postFormActions.length > 0" v-tooltip="i18n.ts.plugins" class="_button" :class="$style.footerButton" @click="showActions"><i class="ti ti-plug"></i></button>
-			<button v-tooltip="i18n.ts.emoji" :class="['_button', $style.footerButton]" @click="insertEmoji"><i class="ti ti-mood-happy"></i></button>
-			<button v-if="showAddMfmFunction" v-tooltip="i18n.ts.addMfmFunction" :class="['_button', $style.footerButton]" @click="insertMfmFunction"><i class="ti ti-palette"></i></button>
+			<template v-for="item in defaultStore.state.postFormActions">
+				<button v-if="!bottomItemActionDef[item].hide" :key="item" v-tooltip="bottomItemDef[item].title" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: bottomItemActionDef[item].active }]" v-on="bottomItemActionDef[item].action ? { click: bottomItemActionDef[item].action } : {}"><i class="ti" :class="bottomItemDef[item].icon"></i></button>
+			</template>
 		</div>
 		<div :class="$style.footerRight">
 			<button v-tooltip="i18n.ts.previewNoteText" class="_button" :class="[$style.footerButton, { [$style.previewButtonActive]: showPreview }]" @click="showPreview = !showPreview"><i class="ti ti-eye"></i></button>
@@ -100,7 +97,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { inject, watch, nextTick, onMounted, defineAsyncComponent, provide, shallowRef, ref, computed } from 'vue';
+import { inject, watch, nextTick, onMounted, defineAsyncComponent, provide, shallowRef, ref, computed, reactive } from 'vue';
 import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
 import insertTextAtCursor from 'insert-text-at-cursor';
@@ -109,12 +106,14 @@ import MkNoteSimple from '@/components/MkNoteSimple.vue';
 import MkNotePreview from '@/components/MkNotePreview.vue';
 import XPostFormAttaches from '@/components/MkPostFormAttaches.vue';
 import MkPollEditor, { type PollEditorModelValue } from '@/components/MkPollEditor.vue';
+import MkDeleteScheduleEditor, { type DeleteScheduleEditorModelValue } from '@/components/MkDeleteScheduleEditor.vue';
 import { host, url } from '@/config.js';
 import { erase, unique } from '@/scripts/array.js';
 import { extractMentions } from '@/scripts/extract-mentions.js';
 import { formatTimeString } from '@/scripts/format-time-string.js';
 import { Autocomplete } from '@/scripts/autocomplete.js';
 import * as os from '@/os.js';
+import * as noteDrafts from '@/scripts/note-drafts.js';
 import { misskeyApi } from '@/scripts/misskey-api.js';
 import { selectFiles } from '@/scripts/select-file.js';
 import { defaultStore, notePostInterruptors, postFormActions } from '@/store.js';
@@ -129,6 +128,7 @@ import { miLocalStorage } from '@/local-storage.js';
 import { claimAchievement } from '@/scripts/achievements.js';
 import { emojiPicker } from '@/scripts/emoji-picker.js';
 import { mfmFunctionPicker } from '@/scripts/mfm-function-picker.js';
+import { bottomItemDef } from '@/scripts/post-form.js';
 
 const $i = signinRequired();
 
@@ -180,7 +180,10 @@ const posted = ref(false);
 const text = ref(props.initialText ?? '');
 const files = ref(props.initialFiles ?? []);
 const poll = ref<PollEditorModelValue | null>(null);
+const scheduledNoteDelete = ref<DeleteScheduleEditorModelValue | null>(null);
 const useCw = ref<boolean>(!!props.initialCw);
+const renote = ref(props.renote);
+const reply = ref(props.reply);
 const showPreview = ref(defaultStore.state.showPreview);
 watch(showPreview, () => defaultStore.set('showPreview', showPreview.value));
 const showAddMfmFunction = ref(defaultStore.state.enableQuickAddMfmFunction);
@@ -202,24 +205,19 @@ const imeText = ref('');
 const showingOptions = ref(false);
 const textAreaReadOnly = ref(false);
 
-const draftKey = computed((): string => {
-	let key = props.channel ? `channel:${props.channel.id}` : '';
-
-	if (props.renote) {
-		key += `renote:${props.renote.id}`;
-	} else if (props.reply) {
-		key += `reply:${props.reply.id}`;
-	} else {
-		key += `note:${$i.id}`;
-	}
-
-	return key;
+const draftType = computed(() => {
+	if (props.channel) return 'channel';
+	if (renote.value) return 'quote';
+	if (reply.value) return 'reply';
+	return 'note';
 });
 
+const draftAuxId = computed<string | null>(() => props.channel ? props.channel.id : renote.value ? renote.value.id : reply.value ? reply.value.id : null);
+
 const placeholder = computed((): string => {
-	if (props.renote) {
+	if (renote.value) {
 		return i18n.ts._postForm.quotePlaceholder;
-	} else if (props.reply) {
+	} else if (reply.value) {
 		return i18n.ts._postForm.replyPlaceholder;
 	} else if (props.channel) {
 		return i18n.ts._postForm.channelPlaceholder;
@@ -237,9 +235,9 @@ const placeholder = computed((): string => {
 });
 
 const submitText = computed((): string => {
-	return props.renote
+	return renote.value
 		? i18n.ts.quote
-		: props.reply
+		: reply.value
 			? i18n.ts.reply
 			: i18n.ts.note;
 });
@@ -268,6 +266,49 @@ const canPost = computed((): boolean => {
 const withHashtags = computed(defaultStore.makeGetterSetter('postFormWithHashtags'));
 const hashtags = computed(defaultStore.makeGetterSetter('postFormHashtags'));
 
+const bottomItemActionDef: Record<keyof typeof bottomItemDef, {
+	hide?: boolean;
+	active?: any;
+	action?: any;
+}> = reactive({
+	attachFile: {
+		action: chooseFileFrom,
+	},
+	poll: {
+		active: poll,
+		action: togglePoll,
+	},
+	scheduledNoteDelete: {
+		active: scheduledNoteDelete,
+		action: toggleScheduledNoteDelete,
+	},
+	useCw: {
+		active: useCw,
+		action: () => useCw.value = !useCw.value,
+	},
+	mention: {
+		action: insertMention,
+	},
+	hashtags: {
+		active: withHashtags,
+		action: () => withHashtags.value = !withHashtags.value,
+	},
+	plugins: {
+		hide: postFormActions.length === 0,
+		action: showActions,
+	},
+	emoji: {
+		action: insertEmoji,
+	},
+	addMfmFunction: {
+		hide: computed(() => !showAddMfmFunction.value),
+		action: insertMfmFunction,
+	},
+	saveAsDraft: {
+		action: () => saveDraft(false),
+	},
+});
+
 watch(text, () => {
 	checkMissingMention();
 }, { immediate: true });
@@ -282,88 +323,93 @@ watch(visibleUsers, () => {
 	deep: true,
 });
 
-if (props.mention) {
-	text.value = props.mention.host ? `@${props.mention.username}@${toASCII(props.mention.host)}` : `@${props.mention.username}`;
-	text.value += ' ';
-}
-
-if (props.reply && (props.reply.user.username !== $i.username || (props.reply.user.host != null && props.reply.user.host !== host))) {
-	text.value = `@${props.reply.user.username}${props.reply.user.host != null ? '@' + toASCII(props.reply.user.host) : ''} `;
-}
-
-if (props.reply && props.reply.text != null) {
-	const ast = mfm.parse(props.reply.text);
-	const otherHost = props.reply.user.host;
-
-	for (const x of extractMentions(ast)) {
-		const mention = x.host ?
-			`@${x.username}@${toASCII(x.host)}` :
-			(otherHost == null || otherHost === host) ?
-				`@${x.username}` :
-				`@${x.username}@${toASCII(otherHost)}`;
-
-		// 自分は除外
-		if ($i.username === x.username && (x.host == null || x.host === host)) continue;
-
-		// 重複は除外
-		if (text.value.includes(`${mention} `)) continue;
-
-		text.value += `${mention} `;
+function initialize() {
+	if (props.mention) {
+		text.value = props.mention.host ? `@${props.mention.username}@${toASCII(props.mention.host)}` : `@${props.mention.username}`;
+		text.value += ' ';
 	}
-}
 
-if ($i.isSilenced && visibility.value === 'public') {
-	visibility.value = 'home';
-}
+	if (reply.value && (reply.value.user.username !== $i.username || (reply.value.user.host != null && reply.value.user.host !== host))) {
+		text.value = `@${reply.value.user.username}${reply.value.user.host != null ? '@' + toASCII(reply.value.user.host) : ''} `;
+	}
 
-if (props.channel) {
-	visibility.value = 'public';
-	localOnly.value = true; // TODO: チャンネルが連合するようになった折には消す
-}
+	if (reply.value && reply.value.text != null) {
+		const ast = mfm.parse(reply.value.text);
+		const otherHost = reply.value.user.host;
 
-// 公開以外へのリプライ時は元の公開範囲を引き継ぐ
-if (props.reply && ['home', 'followers', 'specified'].includes(props.reply.visibility)) {
-	if (props.reply.visibility === 'home' && visibility.value === 'followers') {
-		visibility.value = 'followers';
-	} else if (['home', 'followers'].includes(props.reply.visibility) && visibility.value === 'specified') {
+		for (const x of extractMentions(ast)) {
+			const mention = x.host ?
+				`@${x.username}@${toASCII(x.host)}` :
+				(otherHost == null || otherHost === host) ?
+					`@${x.username}` :
+					`@${x.username}@${toASCII(otherHost)}`;
+
+			// 自分は除外
+			if ($i.username === x.username && (x.host == null || x.host === host)) continue;
+
+			// 重複は除外
+			if (text.value.includes(`${mention} `)) continue;
+
+			text.value += `${mention} `;
+		}
+	}
+
+	if ($i.isSilenced && visibility.value === 'public') {
+		visibility.value = 'home';
+	}
+
+	if (props.channel) {
+		visibility.value = 'public';
+		localOnly.value = true; // TODO: チャンネルが連合するようになった折には消す
+	}
+
+	// 公開以外へのリプライ時は元の公開範囲を引き継ぐ
+	if (reply.value && ['home', 'followers', 'specified'].includes(reply.value.visibility)) {
+		if (reply.value.visibility === 'home' && visibility.value === 'followers') {
+			visibility.value = 'followers';
+		} else if (['home', 'followers'].includes(reply.value.visibility) && visibility.value === 'specified') {
+			visibility.value = 'specified';
+		} else {
+			visibility.value = reply.value.visibility;
+		}
+
+		if (visibility.value === 'specified') {
+			if (props.reply.visibleUserIds) {
+				misskeyApi('users/show', {
+					userIds: props.reply.visibleUserIds.filter(uid => uid !== $i.id && uid !== props.reply?.userId),
+				}).then(users => {
+					users.forEach(u => pushVisibleUser(u));
+				});
+			}
+
+			if (reply.value.userId !== $i.id) {
+				misskeyApi('users/show', { userId: reply.value.userId }).then(user => {
+					pushVisibleUser(user);
+				});
+			}
+		}
+	}
+
+	if (props.specified) {
 		visibility.value = 'specified';
-	} else {
-		visibility.value = props.reply.visibility;
+		pushVisibleUser(props.specified);
 	}
 
-	if (visibility.value === 'specified') {
-		if (props.reply.visibleUserIds) {
-			misskeyApi('users/show', {
-				userIds: props.reply.visibleUserIds.filter(uid => uid !== $i.id && uid !== props.reply?.userId),
-			}).then(users => {
-				users.forEach(u => pushVisibleUser(u));
-			});
-		}
-
-		if (props.reply.userId !== $i.id) {
-			misskeyApi('users/show', { userId: props.reply.userId }).then(user => {
-				pushVisibleUser(user);
-			});
-		}
+	// keep cw when reply
+	if (defaultStore.state.keepCw && reply.value && reply.value.cw) {
+		useCw.value = true;
+		cw.value = reply.value.cw;
 	}
 }
 
-if (props.specified) {
-	visibility.value = 'specified';
-	pushVisibleUser(props.specified);
-}
-
-// keep cw when reply
-if (defaultStore.state.keepCw && props.reply && props.reply.cw) {
-	useCw.value = true;
-	cw.value = props.reply.cw;
-}
+initialize();
 
 function watchForDraft() {
 	watch(text, () => saveDraft());
 	watch(useCw, () => saveDraft());
 	watch(cw, () => saveDraft());
 	watch(poll, () => saveDraft());
+	watch(scheduledNoteDelete, () => saveDraft());
 	watch(files, () => saveDraft(), { deep: true });
 	watch(visibility, () => saveDraft());
 	watch(localOnly, () => saveDraft());
@@ -406,6 +452,17 @@ function togglePoll() {
 			multiple: false,
 			expiresAt: null,
 			expiredAfter: null,
+		};
+	}
+}
+
+function toggleScheduledNoteDelete() {
+	if (scheduledNoteDelete.value) {
+		scheduledNoteDelete.value = null;
+	} else {
+		scheduledNoteDelete.value = {
+			deleteAt: null,
+			deleteAfter: null,
 		};
 	}
 }
@@ -470,7 +527,7 @@ function setVisibility() {
 		isSilenced: $i.isSilenced,
 		localOnly: localOnly.value,
 		src: visibilityButton.value,
-		...(props.reply ? { isReplyVisibilitySpecified: props.reply.visibility === 'specified' } : {}),
+		...(reply.value ? { isReplyVisibilitySpecified: reply.value.visibility === 'specified' } : {}),
 	}, {
 		changeVisibility: v => {
 			visibility.value = v;
@@ -601,7 +658,7 @@ async function onPaste(ev: ClipboardEvent) {
 
 	const paste = ev.clipboardData.getData('text');
 
-	if (!props.renote && !quoteId.value && paste.startsWith(url + '/notes/')) {
+	if (!renote.value && !quoteId.value && paste.startsWith(url + '/notes/')) {
 		ev.preventDefault();
 
 		os.confirm({
@@ -689,36 +746,94 @@ function onDrop(ev: DragEvent): void {
 	//#endregion
 }
 
-function saveDraft() {
+async function saveDraft(auto = true) {
 	if (props.instant || props.mock) return;
 
-	const draftData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}');
+	if (auto && defaultStore.state.draftSavingBehavior !== 'auto') return;
 
-	draftData[draftKey.value] = {
-		updatedAt: new Date(),
-		data: {
-			text: text.value,
-			useCw: useCw.value,
-			cw: cw.value,
-			visibility: visibility.value,
-			localOnly: localOnly.value,
-			files: files.value,
-			poll: poll.value,
-			visibleUserIds: visibility.value === 'specified' ? visibleUsers.value.map(x => x.id) : undefined,
-			quoteId: quoteId.value,
-			reactionAcceptance: reactionAcceptance.value,
-		},
-	};
+	if (!auto) {
+		// 手動での保存の場合は自動保存したものを削除した上で保存
+		await noteDrafts.remove(draftType.value, $i.id, 'default', draftAuxId.value as string);
+	}
 
-	miLocalStorage.setItem('drafts', JSON.stringify(draftData));
+	await noteDrafts.set(draftType.value, $i.id, auto ? 'default' : Date.now().toString(), {
+		text: text.value,
+		useCw: useCw.value,
+		cw: cw.value,
+		visibility: visibility.value,
+		localOnly: localOnly.value,
+		files: files.value,
+		poll: poll.value,
+		visibleUserIds: visibility.value === 'specified' ? visibleUsers.value.map(x => x.id) : undefined,
+		quoteId: quoteId.value,
+		reactionAcceptance: reactionAcceptance.value,
+		scheduledNoteDelete: scheduledNoteDelete.value,
+	}, draftAuxId.value as string);
+
+	if (!auto) {
+		clear();
+	}
 }
 
 function deleteDraft() {
-	const draftData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}');
+	noteDrafts.remove(draftType.value, $i.id, 'default', draftAuxId.value as string);
+}
 
-	delete draftData[draftKey.value];
+function chooseDraft() {
+	os.popup(defineAsyncComponent(() => import('@/components/MkPostFormDrafts.vue')), {
+		channelId: props.channel?.id,
+	}, {
+		selected: async (res) => {
+			const draft = await res as noteDrafts.NoteDraft;
 
-	miLocalStorage.setItem('drafts', JSON.stringify(draftData));
+			if (text.value !== '' || files.value.length > 0) {
+				const { canceled } = await os.confirm({
+					type: 'warning',
+					text: i18n.ts.draftOverwriteConfirm,
+				});
+				if (canceled) return;
+			}
+
+			applyDraft(draft);
+		},
+	}, 'closed');
+}
+
+async function applyDraft(draft: noteDrafts.NoteDraft, native = false) {
+	if (!native) {
+		reply.value = undefined;
+		renote.value = undefined;
+
+		switch (draft.type) {
+			case 'quote': {
+				await os.apiWithDialog('notes/show', { noteId: draft.auxId as string }).then(note => {
+					renote.value = note;
+				});
+				break;
+			}
+			case 'reply': {
+				await os.apiWithDialog('notes/show', { noteId: draft.auxId as string }).then(note => {
+					reply.value = note;
+				});
+				break;
+			}
+		}
+
+		initialize();
+	}
+
+	text.value = draft.data.text;
+	useCw.value = draft.data.useCw;
+	cw.value = draft.data.cw;
+	visibility.value = draft.data.visibility;
+	localOnly.value = draft.data.localOnly;
+	files.value = (draft.data.files || []).filter(draftFile => draftFile);
+	if (draft.data.poll) {
+		poll.value = draft.data.poll;
+	}
+	if (draft.data.scheduledNoteDelete) {
+		scheduledNoteDelete.value = draft.data.scheduledNoteDelete;
+	}
 }
 
 async function post(ev?: MouseEvent) {
@@ -779,10 +894,11 @@ async function post(ev?: MouseEvent) {
 	let postData = {
 		text: text.value === '' ? null : text.value,
 		fileIds: files.value.length > 0 ? files.value.map(f => f.id) : undefined,
-		replyId: props.reply ? props.reply.id : undefined,
-		renoteId: props.renote ? props.renote.id : quoteId.value ? quoteId.value : undefined,
+		replyId: reply.value ? reply.value.id : undefined,
+		renoteId: renote.value ? renote.value.id : quoteId.value ? quoteId.value : undefined,
 		channelId: props.channel ? props.channel.id : undefined,
 		poll: poll.value,
+		scheduledDelete: scheduledNoteDelete.value,
 		cw: useCw.value ? cw.value ?? '' : null,
 		localOnly: localOnly.value,
 		visibility: visibility.value,
@@ -868,7 +984,7 @@ async function post(ev?: MouseEvent) {
 				claimAchievement('brainDiver');
 			}
 
-			if (props.renote && (props.renote.userId === $i.id) && text.length > 0) {
+			if (renote.value && (renote.value.userId === $i.id) && text.length > 0) {
 				claimAchievement('selfQuote');
 			}
 
@@ -894,6 +1010,18 @@ async function post(ev?: MouseEvent) {
 
 function cancel() {
 	emit('cancel');
+}
+
+async function closed() {
+	if (defaultStore.state.draftSavingBehavior === 'manual' && !posted.value && (text.value !== '' || files.value.length > 0)) {
+		os.confirm({
+			type: 'question',
+			text: i18n.ts.saveConfirm,
+		}).then(({ canceled }) => {
+			if (canceled) return;
+			saveDraft(false);
+		});
+	}
 }
 
 function insertMention() {
@@ -989,20 +1117,14 @@ onMounted(() => {
 	if (cwInputEl.value) new Autocomplete(cwInputEl.value, cw);
 	if (hashtagsInputEl.value) new Autocomplete(hashtagsInputEl.value, hashtags);
 
-	nextTick(() => {
+	nextTick(async () => {
+		await noteDrafts.migrate($i.id);
+
 		// 書きかけの投稿を復元
 		if (!props.instant && !props.mention && !props.specified && !props.mock) {
-			const draft = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}')[draftKey.value];
+			const draft = await noteDrafts.get(draftType.value, $i.id, 'default', draftAuxId.value as string);
 			if (draft) {
-				text.value = draft.data.text;
-				useCw.value = draft.data.useCw;
-				cw.value = draft.data.cw;
-				visibility.value = draft.data.visibility;
-				localOnly.value = draft.data.localOnly;
-				files.value = (draft.data.files || []).filter(draftFile => draftFile);
-				if (draft.data.poll) {
-					poll.value = draft.data.poll;
-				}
+				applyDraft(draft, true);
 				if (draft.data.visibleUserIds) {
 					misskeyApi('users/show', { userIds: draft.data.visibleUserIds }).then(users => {
 						users.forEach(u => pushVisibleUser(u));
@@ -1030,6 +1152,12 @@ onMounted(() => {
 					expiredAfter: null,
 				};
 			}
+			if (init.deleteAt) {
+				scheduledNoteDelete.value = {
+					deleteAt: init.deleteAt ? (new Date(init.deleteAt)).getTime() : null,
+					deleteAfter: null,
+				};
+			}
 			if (init.visibleUserIds) {
 				misskeyApi('users/show', { userIds: init.visibleUserIds }).then(users => {
 					users.forEach(u => pushVisibleUser(u));
@@ -1045,6 +1173,7 @@ onMounted(() => {
 
 defineExpose({
 	clear,
+	closed,
 });
 </script>
 

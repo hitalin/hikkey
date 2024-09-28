@@ -88,6 +88,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'account',
 		default: true,
 	},
+	draftSavingBehavior: {
+		where: 'account',
+		default: 'auto' as 'auto' | 'manual',
+	},
 	rememberNoteVisibility: {
 		where: 'account',
 		default: false,
@@ -146,6 +150,20 @@ export const defaultStore = markRaw(new Storage('base', {
 			'search',
 			'-',
 			'ui',
+		],
+	},
+	postFormActions: {
+		where: 'deviceAccount',
+		default: [
+			'attachFile',
+			'poll',
+			'scheduledNoteDelete',
+			'useCw',
+			'mention',
+			'hashtags',
+			'plugins',
+			'emoji',
+			'addMfmFunction',
 		],
 	},
 	visibility: {
@@ -242,6 +260,18 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: false,
 	},
+	hiddenPinnedNotes: {
+		where: 'device',
+		default: false,
+	},
+	hiddenActivity: {
+		where: 'device',
+		default: false,
+	},
+	hiddenFiles: {
+		where: 'device',
+		default: false,
+	},
 	disableShowingAnimatedImages: {
 		where: 'device',
 		default: window.matchMedia('(prefers-reduced-motion)').matches,
@@ -285,6 +315,10 @@ export const defaultStore = markRaw(new Storage('base', {
 	darkMode: {
 		where: 'device',
 		default: false,
+	},
+	customFont: {
+		where: 'device',
+		default: null as null | string,
 	},
 	instanceTicker: {
 		where: 'device',
@@ -378,6 +412,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: false,
 	},
+	nicknameEnabled: {
+		where: 'account',
+		default: true,
+	},
 	mediaListWithOneImageAppearance: {
 		where: 'device',
 		default: 'expand' as 'expand' | '16_9' | '1_1' | '2_3',
@@ -458,10 +496,12 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: false,
 	},
-  contextMenu: {
+	contextMenu: {
+	contextMenu: {
 		where: 'device',
 		default: 'app' as 'app' | 'appWithShift' | 'native',
-  },
+	},
+	},
 
 	sound_masterVolume: {
 		where: 'device',
@@ -490,6 +530,18 @@ export const defaultStore = markRaw(new Storage('base', {
 	sound_reaction: {
 		where: 'device',
 		default: { type: 'syuilo/bubble2', volume: 1 } as SoundStore,
+	},
+	nicknameMap: {
+		where: 'account',
+		default: {} as Record<string, string>,
+	},
+	directRenote: {
+		where: 'device',
+		default: false,
+	},
+	reactionChecksMuting: {
+		where: 'device',
+		default: true,
 	},
 }));
 
@@ -522,6 +574,7 @@ interface Watcher {
  */
 import lightTheme from '@/themes/l-light.json5';
 import darkTheme from '@/themes/d-green-lime.json5';
+import { directRenote } from './scripts/direct-renote.js';
 
 export class ColdDeviceStorage {
 	public static default = {

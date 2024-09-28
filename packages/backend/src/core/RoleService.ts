@@ -42,6 +42,7 @@ export type RolePolicies = {
 	inviteExpirationTime: number;
 	canManageCustomEmojis: boolean;
 	canManageAvatarDecorations: boolean;
+	canEmojiDeletion: boolean;
 	canSearchNotes: boolean;
 	canUseTranslator: boolean;
 	canHideAds: boolean;
@@ -58,6 +59,8 @@ export type RolePolicies = {
 	userEachUserListsLimit: number;
 	rateLimitFactor: number;
 	avatarDecorationLimit: number;
+	mutualLinkSectionLimit: number;
+	mutualLinkLimit: number;
 };
 
 export const DEFAULT_POLICIES: RolePolicies = {
@@ -71,6 +74,7 @@ export const DEFAULT_POLICIES: RolePolicies = {
 	inviteExpirationTime: 0,
 	canManageCustomEmojis: false,
 	canManageAvatarDecorations: false,
+	canEmojiDeletion: false,
 	canSearchNotes: false,
 	canUseTranslator: true,
 	canHideAds: false,
@@ -87,6 +91,8 @@ export const DEFAULT_POLICIES: RolePolicies = {
 	userEachUserListsLimit: 50,
 	rateLimitFactor: 1,
 	avatarDecorationLimit: 1,
+	mutualLinkSectionLimit: 1,
+	mutualLinkLimit: 15,
 };
 
 @Injectable()
@@ -371,6 +377,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			inviteExpirationTime: calc('inviteExpirationTime', vs => Math.max(...vs)),
 			canManageCustomEmojis: calc('canManageCustomEmojis', vs => vs.some(v => v === true)),
 			canManageAvatarDecorations: calc('canManageAvatarDecorations', vs => vs.some(v => v === true)),
+			canEmojiDeletion: calc('canEmojiDeletion', vs => vs.some(v => v === true)),
 			canSearchNotes: calc('canSearchNotes', vs => vs.some(v => v === true)),
 			canUseTranslator: calc('canUseTranslator', vs => vs.some(v => v === true)),
 			canHideAds: calc('canHideAds', vs => vs.some(v => v === true)),
@@ -387,6 +394,8 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			userEachUserListsLimit: calc('userEachUserListsLimit', vs => Math.max(...vs)),
 			rateLimitFactor: calc('rateLimitFactor', vs => Math.max(...vs)),
 			avatarDecorationLimit: calc('avatarDecorationLimit', vs => Math.max(...vs)),
+			mutualLinkSectionLimit: calc('mutualLinkSectionLimit', vs => Math.max(...vs)),
+			mutualLinkLimit: calc('mutualLinkLimit', vs => Math.max(...vs)),
 		};
 	}
 

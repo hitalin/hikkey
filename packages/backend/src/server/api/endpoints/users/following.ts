@@ -18,7 +18,7 @@ import { ApiError } from '../../error.js';
 export const meta = {
 	tags: ['users'],
 
-	requireCredential: false,
+	requireCredential: true,
 
 	description: 'Show everyone that this user is following.',
 

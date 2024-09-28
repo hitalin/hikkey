@@ -2113,6 +2113,10 @@ export interface Locale extends ILocale {
      */
     "fontSize": string;
     /**
+     * カスタムフォント
+     */
+    "customFont": string;
+    /**
      * 画像が1枚のみのメディアリストの高さ
      */
     "mediaListWithOneImageAppearance": string;
@@ -2416,6 +2420,14 @@ export interface Locale extends ILocale {
      * バナーを解除しますか？
      */
     "unsetUserBannerConfirm": string;
+    /**
+     * 相互リンクを削除
+     */
+    "unsetUserMutualLink": string;
+    /**
+     * 相互リンクを削除しますか？
+     */
+    "unsetUserMutualLinkConfirm": string;
     /**
      * すべてのファイルを削除
      */
@@ -3936,6 +3948,10 @@ export interface Locale extends ILocale {
      * ベータ
      */
     "beta": string;
+		/**
+     * 独自機能
+     */
+		"originalFeature": string;
     /**
      * 自動センシティブ判定
      */
@@ -4172,6 +4188,14 @@ export interface Locale extends ILocale {
      * リアクションやリノートをしたことがあるノートをたたんで表示します。
      */
     "collapseRenotesDescription": string;
+    /**
+     * ダイレクトリノート
+     */
+    "directRenote": string;
+    /**
+     * メニューを表示せず、そのままリノートすることができます。引用はミートボールメニューに格納されています
+     */
+    "directRenoteDescription": string;
     /**
      * サーバー内部エラー
      */
@@ -5009,6 +5033,14 @@ export interface Locale extends ILocale {
      */
     "gameRetry": string;
     /**
+     * すぐ消す
+     */
+    "scheduledNoteDelete": string;
+    /**
+     * このノートは{time}に消去されます
+     */
+    "noteDeletationAt": ParameterizedString<"time">;
+		/**
      * 使用しない場合は空欄にしてください
      */
     "notUsePleaseLeaveBlank": string;
@@ -5100,6 +5132,42 @@ export interface Locale extends ILocale {
             "autoSuspendedForNotResponding": string;
         };
     };
+    /**
+     * 相互リンク
+     */
+    "mutualLink": string;
+    /**
+     * このユーザーのバナー
+     */
+    "mutualBannerThisUser": string;
+    /**
+     * 最大
+     */
+    "maximum": string;
+    /**
+     * 投稿フォーム
+     */
+    "postForm": string;
+    /**
+     * 投稿フォームの下部に表示される項目の並び替えが出来ます。項目をクリックすると削除できます。
+     */
+    "postFormBottomSettingsDescription": string;
+    /**
+     * 下書き
+     */
+    "drafts": string;
+    /**
+     * 下書きの保存に関する動作
+     */
+    "draftSavingBehavior": string;
+    /**
+     * 下書きとして保存
+     */
+    "saveAsDraft": string;
+    /**
+     * 下書きを適用すると現在入力されている内容はリセットされます。よろしいですか？
+     */
+    "draftOverwriteConfirm": string;
     "_bubbleGame": {
         /**
          * 遊び方
@@ -5154,6 +5222,8 @@ export interface Locale extends ILocale {
             "section3": string;
         };
     };
+    "autoRejectFollowRequest": string;
+    "autoRejectFollowRequestDescription": string;
     "_announcement": {
         /**
          * 既存ユーザーのみ
@@ -6738,6 +6808,14 @@ export interface Locale extends ILocale {
              * アイコンデコレーションの最大取付個数
              */
             "avatarDecorationLimit": string;
+            /**
+             * 相互リンクのセクションの最大数
+             */
+            "mutualLinkSectionLimit": string;
+            /**
+             * セクション内の相互リンクの最大数
+             */
+            "mutualLinkLimit": string;
         };
         "_condition": {
             /**
@@ -8052,6 +8130,10 @@ export interface Locale extends ILocale {
          */
         "write:admin:unset-user-banner": string;
         /**
+         * ユーザーの相互リンクを削除する
+         */
+        "write:admin:unset-user-mutual-link": string;
+        /**
          * ユーザーの凍結を解除する
          */
         "write:admin:unsuspend-user": string;
@@ -8629,6 +8711,50 @@ export interface Locale extends ILocale {
          * 最大{max}つまでデコレーションを付けられます。
          */
         "avatarDecorationMax": ParameterizedString<"max">;
+        /**
+         * 相互リンクを編集
+         */
+        "mutualLinksEdit": string;
+        /**
+         * 相互リンクのバナー
+         */
+        "mutualLinksBanner": string;
+        /**
+         * 説明
+         */
+        "mutualLinksDescriptionEdit": string;
+        /**
+         * リンク先のURL
+         */
+        "mutualLinksUrl": string;
+        /**
+         * このセクションをプロフィールにピン留め
+         */
+        "mutualLinkPining": string;
+        /**
+         * 相互リンクを設定すると、あなたのプロフィールにバナーが表示されます。
+         */
+        "mutualLinksDescription": string;
+        /**
+         * 相互リンクを追加
+         */
+        "addMutualLink": string;
+        /**
+         * セクションを追加
+         */
+        "addMutualLinkSection": string;
+        /**
+         * セクション名
+         */
+        "sectionName": string;
+        /**
+         * セクション名を表示しないようにする
+         */
+        "sectionNameNoneDescription": string;
+        /**
+         * 名前が表示されないセクション
+         */
+        "sectionNameNone": string;
     };
     "_exportOrImport": {
         /**
@@ -10095,6 +10221,18 @@ export interface Locale extends ILocale {
          * 石をアイコンにする
          */
         "useAvatarAsStone": string;
+        /**
+         * リモートサーバーのバージョンが不明です
+         */
+        "remoteVersionUnknown": string;
+        /**
+         * 対応していない可能性があります
+         */
+        "remoteVersionUnknownCaption": string;
+        /**
+         * リモートサーバーのバージョンが非互換です
+         */
+        "remoteVersionBad": string;
     };
     "_offlineScreen": {
         /**
@@ -10191,6 +10329,64 @@ export interface Locale extends ILocale {
          * ブラウザのUI
          */
         "native": string;
+    };
+    "_uniqueFeatures": {
+        /**
+         * 独自機能
+         */
+        "uniqueFeature": string;
+        /**
+         * リモート上のサーバーのローカルタイムラインを覗く機能
+         */
+        // "remoteLocalTimeline": string;
+        /**
+         * プロフィールを非表示にする機能
+         */
+        "hiddenProfile": string;
+        /**
+         * プロフィール上からピン留めしたノートを非表示にします
+         */
+        "hiddenPinnedNotes": string;
+        /**
+         * ピン留めしたノートを非表示にすることで、プロフィールページをスッキリさせることができます。
+         */
+        "hiddenPinnedNotesDescription": string;
+        /**
+         * プロフィール上からアクティビティを非表示にします
+         */
+        "hiddenActivity": string;
+        /**
+         * プロフィール上からアクティビティを非表示にすることで、プロフィールページをスッキリさせることができます。
+         */
+        "hiddenActivityDescription": string;
+        /**
+         * プロフィール上からファイルを非表示にします。
+         */
+        "hiddenFiles": string;
+        /**
+         * ファイルを非表示にすることで、プロフィールページをスッキリさせることができます。
+         */
+        "hiddenFilesDescription": string;
+    };
+    "_draftSavingBehavior": {
+        /**
+         * 自動的に保存する
+         */
+        "auto": string;
+        /**
+         * 都度確認する
+         */
+        "manual": string;
+    };
+    "_reactionChecksMuting": {
+        /**
+         * リアクションでミュートを考慮する
+         */
+        "title": string;
+        /**
+         * リアクションがミュートを考慮しますが、キャッシュが効かず通信量が増えることがあります。
+         */
+        "caption": string;
     };
 }
 declare const locales: {

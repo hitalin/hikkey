@@ -20,7 +20,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<div ref="bannerEl" class="banner" :style="style"></div>
 						<div class="fade"></div>
 						<div class="title">
-							<MkUserName class="name" :user="user" :nowrap="true"/>
+							<div class="name">
+								<MkUserName :user="user" :nowrap="true" @click="editNickname(props.user)"/>
+							</div>
 							<div class="bottom">
 								<span class="username"><MkAcct :user="user" :detail="true"/></span>
 								<span v-if="user.isAdmin" :title="i18n.ts.isAdmin" style="color: var(--badge);"><i class="ti ti-shield"></i></span>
@@ -39,7 +41,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</div>
 					<MkAvatar class="avatar" :user="user" indicator/>
 					<div class="title">
-						<MkUserName :user="user" :nowrap="false" class="name"/>
+						<MkUserName :user="user" :nowrap="false" class="name" @click="editNickname(props.user)"/>
 						<div class="bottom">
 							<span class="username"><MkAcct :user="user" :detail="true"/></span>
 							<span v-if="user.isAdmin" :title="i18n.ts.isAdmin" style="color: var(--badge);"><i class="ti ti-shield"></i></span>
@@ -78,8 +80,36 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkOmit>
 							<Mfm v-if="user.description" :text="user.description" :isNote="false" :author="user"/>
 							<p v-else class="empty">{{ i18n.ts.noAccountDescription }}</p>
+							<div v-if="user.description && isForeignLanguage">
+								<MkButton v-if="!(translating || translation)" class="translateButton" small @click="translate"><i class="ti ti-language-hiragana"></i> {{ i18n.ts.translateProfile }}</MkButton>
+								<MkButton v-else class="translateButton" small @click="translation = null"><i class="ti ti-x"></i> {{ i18n.ts.close }}</MkButton>
+							</div>
 						</MkOmit>
 					</div>
+					<MkContainer v-if="user?.mutualLinkSections?.length > 0" :showHeader="false" :max-height="200" class="fields" :style="{borderRadius: 0}">
+						<div v-for="(section, index) in user?.mutualLinkSections" :key="index" :class="$style.mutualLinkSections">
+							<span v-if="section.name">{{ section.name }}</span>
+							<div :class="$style.mutualLinks">
+								<div v-for="mutualLink in section.mutualLinks" :key="mutualLink.id">
+									<MkLink :hideIcon="true" :url="mutualLink.url">
+										<img :class="$style.mutualLinkImg" :src="getProxiedImageUrl(mutualLink.imgSrc)" :alt="mutualLink.description"/>
+									</MkLink>
+								</div>
+							</div>
+						</div>
+					</MkContainer>
+					<MkContainer v-if="user?.mutualLinkSections?.length > 0" :showHeader="false" :max-height="200" class="fields" :style="{borderRadius: 0}">
+						<div v-for="(section, index) in user?.mutualLinkSections" :key="index" :class="$style.mutualLinkSections">
+							<span v-if="section.name">{{ section.name }}</span>
+							<div :class="$style.mutualLinks">
+								<div v-for="mutualLink in section.mutualLinks" :key="mutualLink.id">
+									<MkLink :hideIcon="true" :url="mutualLink.url">
+										<img :class="$style.mutualLinkImg" :src="getProxiedImageUrl(mutualLink.imgSrc)" :alt="mutualLink.description"/>
+									</MkLink>
+								</div>
+							</div>
+						</div>
+					</MkContainer>
 					<div class="fields system">
 						<dl v-if="user.location" class="field">
 							<dt class="name"><i class="ti ti-map-pin ti-fw"></i> {{ i18n.ts.location }}</dt>
@@ -123,18 +153,26 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 
 			<div class="contents _gaps">
-				<div v-if="user.pinnedNotes.length > 0" class="_gaps">
-					<MkNote v-for="note in user.pinnedNotes" :key="note.id" class="note _panel" :note="note" :pinned="true"/>
+				<div v-if="!hiddenPinnedNotes">
+					<div v-if="user.pinnedNotes.length > 0" class="_gaps">
+						<MkNote v-for="note in user.pinnedNotes" :key="note.id" class="note _panel" :note="note" :pinned="true"/>
+					</div>
 				</div>
 				<MkInfo v-else-if="$i && $i.id === user.id">{{ i18n.ts.userPagePinTip }}</MkInfo>
-				<template v-if="narrow">
-					<MkLazy>
-						<XFiles :key="user.id" :user="user"/>
-					</MkLazy>
-					<MkLazy>
-						<XActivity :key="user.id" :user="user"/>
-					</MkLazy>
-				</template>
+				<div v-if="!hiddenActivity">
+					<template v-if="narrow">
+						<MkLazy>
+							<XFiles :key="user.id" :user="user"/>
+						</MkLazy>
+					</template>
+				</div>
+				<div v-if="!hiddenFiles">
+					<template v-if="narrow">
+						<MkLazy>
+							<XActivity :key="user.id" :user="user"/>
+						</MkLazy>
+					</template>
+				</div>
 				<div v-if="!disableNotes">
 					<MkLazy>
 						<XTimeline :user="user"/>
@@ -174,7 +212,10 @@ import { confetti } from '@/scripts/confetti.js';
 import { misskeyApi } from '@/scripts/misskey-api.js';
 import { isFollowingVisibleForMe, isFollowersVisibleForMe } from '@/scripts/isFfVisibleForMe.js';
 import { useRouter } from '@/router/supplier.js';
-import { getStaticImageUrl } from '@/scripts/media-proxy.js';
+import { getStaticImageUrl, getProxiedImageUrl } from '@/scripts/media-proxy.js';
+import {editNickname} from "@/scripts/edit-nickname";
+import MkLink from '@/components/MkLink.vue';
+import MkContainer from '@/components/MkContainer.vue';
 
 function calcAge(birthdate: string): number {
 	const date = new Date(birthdate);
@@ -215,6 +256,9 @@ const memoDraft = ref(props.user.memo);
 const isEditingMemo = ref(false);
 const moderationNote = ref(props.user.moderationNote);
 const editModerationNote = ref(false);
+const hiddenPinnedNotes = defaultStore.state.hiddenPinnedNotes;
+const hiddenActivity = defaultStore.state.hiddenActivity;
+const hiddenFiles = defaultStore.state.hiddenFiles;
 
 watch(moderationNote, async () => {
 	await misskeyApi('admin/update-user-note', { userId: props.user.id, text: moderationNote.value });
@@ -399,13 +443,26 @@ onUnmounted(() => {
 						color: #fff;
 
 						> .name {
-							display: block;
+							display: flex;
+							gap: 8px;
 							margin: -10px;
 							padding: 10px;
 							line-height: 32px;
 							font-weight: bold;
 							font-size: 1.8em;
 							filter: drop-shadow(0 0 4px #000);
+
+							> .nickname-button {
+								-webkit-backdrop-filter: var(--blur, blur(8px));
+								backdrop-filter: var(--blur, blur(8px));
+								background: rgba(0, 0, 0, 0.2);
+								color: #ccc;
+								font-size: 0.7em;
+								line-height: 1;
+								width: 1.8em;
+								height: 1.8em;
+								border-radius: 100%;
+							}
 						}
 
 						> .bottom {
@@ -446,6 +503,10 @@ onUnmounted(() => {
 							margin-right: 8px;
 							opacity: 0.8;
 						}
+					}
+
+					> .nickname-button {
+						margin-left: 8px;
 					}
 				}
 
@@ -689,5 +750,38 @@ onUnmounted(() => {
 .verifiedLink {
 	margin-left: 4px;
 	color: var(--success);
+}
+
+.mutualLinkSections {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-around;
+	flex-direction: column;
+	background: var(--panel);
+	gap: 8px;
+	margin-bottom: 8px;
+
+}
+
+.mutualLinks {
+	display: flex;
+	justify-content: space-around;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding-top: 8px;
+	@media (max-width: 500px) {
+		gap: 8px;
+	}
+}
+
+.mutualLink {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.mutualLinkImg {
+	max-width: 200px;
+	max-height: 40px;
 }
 </style>
